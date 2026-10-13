@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Учёт голосом</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#EDF0EA;--sf:#F8FAF6;--ink:#17231F;--mut:#5E6B66;--ln:#D3D9D1;--inc:#187A52;--exp:#B23A2B;--ac:#2B45E8;--acf:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615}}
+:root[data-theme="dark"]{--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
+main{max-width:560px;margin:0 auto;padding:28px 20px 190px}
+.m{margin:0;color:var(--mut);font-size:15px;text-transform:capitalize}
+h1{margin:2px 0 6px;font-size:clamp(40px,12vw,56px);line-height:1.05;font-weight:800;letter-spacing:-.02em}
+h1.neg{color:var(--exp)}
+.sub{margin:0;display:flex;gap:18px;flex-wrap:wrap;font-weight:600}
+.sub .i{color:var(--inc)}.sub .e{color:var(--exp)}
+.cats{margin:28px 0 8px}
+.cats h2,.day{margin:0 0 10px;font-size:14px;font-weight:600;color:var(--mut)}
+.bar-row{display:grid;grid-template-columns:110px 1fr auto;gap:10px;align-items:center;margin:7px 0;font-size:14px}
+.track{height:8px;background:var(--ln);border-radius:4px;overflow:hidden}
+.fill{height:100%;background:var(--exp);border-radius:4px}
+.day{margin-top:26px;padding-bottom:6px;border-bottom:1px solid var(--ln)}
+.it{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 0;border-bottom:1px solid var(--ln)}
+.it .n{font-weight:600;overflow-wrap:anywhere}
+.it .a{font-weight:800;text-align:right;white-space:nowrap}
+.it .a.i{color:var(--inc)}.it .a.e{color:var(--exp)}
+.it select{appearance:none;-webkit-appearance:none;background:none;border:0;color:var(--mut);font:inherit;font-size:14px;padding:0;margin:0;max-width:100%;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.it .x{background:none;border:0;color:var(--mut);font:inherit;font-size:14px;cursor:pointer;justify-self:end;padding:2px 0}
+.empty{margin:36px 0;color:var(--mut)}
+.empty b{color:var(--ink)}
+footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--ln);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.in{max-width:560px;margin:0 auto}
+#msg{min-height:22px;margin:0 0 8px;font-size:14px;color:var(--mut);overflow-wrap:anywhere}
+#msg button{background:none;border:0;color:var(--ac);font:inherit;font-weight:600;cursor:pointer;padding:0 0 0 8px}
+.row{display:flex;gap:10px;align-items:center}
+#txt{flex:1;min-width:0;height:56px;border:1px solid var(--ln);background:var(--sf);color:var(--ink);border-radius:28px;padding:0 20px;font:inherit}
+#txt::placeholder{color:var(--mut)}
+#mic{flex:none;width:56px;height:56px;border-radius:50%;border:0;background:var(--ac);color:var(--acf);display:grid;place-items:center;cursor:pointer;position:relative}
+#mic svg{width:26px;height:26px}
+#mic.on::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--ac);animation:p 1.1s ease-out infinite}
+@keyframes p{from{transform:scale(.85);opacity:.9}to{transform:scale(1.25);opacity:0}}
+:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){#mic.on::after{animation:none}}
+</style>
+</head>
+<body>
+<main>
+  <p class="m" id="month"></p>
+  <h1 id="bal">0 ₽</h1>
+  <p class="sub"><span class="i" id="inc"></span><span class="e" id="exp"></span></p>
+  <section class="cats" id="cats"></section>
+  <section id="list"></section>
+</main>
+<footer><div class="in">
+  <p id="msg" aria-live="polite"></p>
+  <div class="row">
+    <input id="txt" type="text" enterkeyhint="send" autocomplete="off" placeholder="Нажмите и надиктуйте: кофе 250" aria-label="Запись текстом">
+    <button id="mic" aria-label="Говорить" title="Говорить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+  </div>
+</div></footer>
+<script>
+const $=s=>document.querySelector(s);
+const EC=['Продукты','Кафе','Транспорт','Жильё','Здоровье','Одежда','Развлечения','Связь','Подарки','Прочее'];
+const IC=['Зарплата','Подработка','Прочий доход'];
+const KW={Продукты:['продукт','магазин','пятероч','магнит','перекрест','вкусвилл','лента','ашан','хлеб','молок','овощ','фрукт','мяс'],
+Кафе:['кафе','ресторан','кофе','обед','ужин','завтрак','пицц','бургер','суши','столов','доставк'],
+Транспорт:['такси','метро','автобус','бензин','заправ','проезд','парковк','маршрутк','электричк','поезд','билет'],
+Жильё:['аренд','квартир','коммунал','электричеств','ипотек'],
+Здоровье:['аптек','врач','лекарств','таблетк','стоматолог','больниц','анализ'],
+Одежда:['одежд','куртк','кроссовк','обув','футболк','джинс'],
+Развлечения:['кино','игр','концерт','театр','подписк','netflix'],
+Связь:['связ','телефон','мобильн','интернет','мтс','билайн','мегафон','теле2'],
+Подарки:['подар','цветы','букет'],
+Зарплата:['зарплат','аванс','оклад','премия'],
+Подработка:['подработк','фриланс','заказ']};
+const INC=['получил','зарплат','аванс','заработал','пришл','доход','вернул','подарили','премия','продал'];
+const W={ноль:0,один:1,одна:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19,двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90,сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900,полторы:1.5,полтора:1.5};
+const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
+
+let S=[];
+try{S=JSON.parse(localStorage.getItem('fin_v1')||'[]')}catch(e){S=[]}
+const save=()=>{try{localStorage.setItem('fin_v1',JSON.stringify(S))}catch(e){}};
+
+function amount(t){
+  const m=[...t.matchAll(/(\d[\d\s]*(?:[.,]\d+)?)\s*(тыс\w*|к(?![а-я])|млн)?/g)];
+  if(m.length){
+    const vals=m.map(x=>{let v=parseFloat(x[1].replace(/\s/g,'').replace(',','.'));
+      if(x[2]){v*=x[2]==='млн'?1e6:1000}return v}).filter(v=>v>0);
+    if(vals.length)return Math.max(...vals);
+  }
+  let sum=0,cur=0,found=false;
+  for(const w of t.split(/[^а-я]+/)){
+    if(w in W){cur+=W[w];found=true}
+    else if(w.startsWith('тысяч')&&found){sum+=(cur||1)*1000;cur=0}
+    else if(w==='тысяча'||w==='тысячу'){sum+=1000;found=true}
+  }
+  return found?sum+cur:0;
+}
+function parse(raw){
+  const t=raw.toLowerCase().replace(/ё/g,'е');
+  const amt=amount(t);if(!amt)return null;
+  const inc=INC.some(w=>t.includes(w));
+  const list=inc?IC:EC;
+  let cat=inc?'Прочий доход':'Прочее';
+  for(const c of list){if((KW[c]||[]).some(k=>t.includes(k))){cat=c;break}}
+  const note=raw.trim().replace(/^./,c=>c.toUpperCase());
+  return{id:Date.now()+Math.random(),ts:Date.now(),amt,inc,cat,note};
+}
+
+let msgTimer;
+function say(text,undoId){
+  const el=$('#msg');el.textContent=text;
+  if(undoId){const b=document.createElement('button');b.textContent='Отменить';
+    b.onclick=()=>{S=S.filter(e=>e.id!==undoId);save();render();say('Запись удалена')};el.appendChild(b)}
+  clearTimeout(msgTimer);if(undoId)msgTimer=setTimeout(()=>{el.textContent=''},7000);
+}
+function submit(text){
+  const e=parse(text);
+  if(!e){say('Не услышал сумму. Скажите, например: «такси 450».');return}
+  S.push(e);save();render();
+  say((e.inc?'Доход +':'Расход −')+fmt(e.amt)+' · '+e.cat,e.id);
+}
+
+function dayLabel(ts){
+  const d=new Date(ts),n=new Date();
+  const k=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((k(n)-k(d))/864e5);
+  if(diff===0)return'Сегодня';if(diff===1)return'Вчера';
+  return d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
+
+function render(){
+  const now=new Date();
+  const mo=S.filter(e=>{const d=new Date(e.ts);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
+  const inc=mo.filter(e=>e.inc).reduce((a,e)=>a+e.amt,0);
+  const exp=mo.filter(e=>!e.inc).reduce((a,e)=>a+e.amt,0);
+  $('#month').textContent='Баланс за '+now.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
+  $('#bal').textContent=fmt(inc-exp);$('#bal').className=inc-exp<0?'neg':'';
+  $('#inc').textContent='Доходы +'+fmt(inc);$('#exp').textContent='Расходы −'+fmt(exp);
+
+  const cats=$('#cats');cats.textContent='';
+  const by={};mo.filter(e=>!e.inc).forEach(e=>by[e.cat]=(by[e.cat]||0)+e.amt);
+  const top=Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(top.length){
+    cats.appendChild(el('h2','','Куда уходят деньги'));
+    top.forEach(([c,v])=>{
+      const r=el('div','bar-row');r.appendChild(el('span','',c));
+      const tr=el('div','track'),f=el('div','fill');f.style.width=Math.max(4,v/exp*100)+'%';tr.appendChild(f);
+      r.appendChild(tr);r.appendChild(el('span','',fmt(v)));cats.appendChild(r);
+    });
+  }
+
+  const box=$('#list');box.textContent='';
+  if(!S.length){
+    const p=el('p','empty');p.append('Пока пусто. Нажмите на микрофон и скажите: ');
+    p.appendChild(el('b','','«купил продукты на 1200»'));p.append(' или «получил зарплату 80 тысяч».');
+    box.appendChild(p);return;
+  }
+  let last='';
+  [...S].sort((a,b)=>b.ts-a.ts).slice(0,100).forEach(e=>{
+    const dl=dayLabel(e.ts);
+    if(dl!==last){box.appendChild(el('h3','day',dl));last=dl}
+    const row=el('div','it');
+    row.appendChild(el('span','n',e.note));
+    row.appendChild(el('span','a '+(e.inc?'i':'e'),(e.inc?'+':'−')+fmt(e.amt)));
+    const sel=el('select');sel.setAttribute('aria-label','Категория');
+    (e.inc?IC:EC).forEach(c=>{const o=el('option','',c);o.value=c;if(c===e.cat)o.selected=true;sel.appendChild(o)});
+    sel.onchange=()=>{e.cat=sel.value;save();render()};
+    const x=el('button','x','Удалить');x.onclick=()=>{S=S.filter(i=>i.id!==e.id);save();render()};
+    row.appendChild(sel);row.appendChild(x);box.appendChild(row);
+  });
+}
+
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,on=false;
+$('#mic').onclick=()=>{
+  if(!SR){say('Голосовой ввод не работает в этом браузере. Откройте страницу в Chrome или пишите текстом.');return}
+  if(on){rec.stop();return}
+  rec=new SR();rec.lang='ru-RU';rec.interimResults=true;rec.maxAlternatives=1;
+  rec.onresult=ev=>{
+    let t='',fin=false;
+    for(const r of ev.results){t+=r[0].transcript;if(r.isFinal)fin=true}
+    say('Слышу: '+t);if(fin)submit(t);
+  };
+  rec.onerror=ev=>{
+    const m={'not-allowed':'Нет доступа к микрофону. Разрешите его в настройках браузера.','service-not-allowed':'Нет доступа к микрофону. Разрешите его в настройках браузера.','no-speech':'Речь не слышна. Нажмите на микрофон и повторите.','network':'Нет связи с сервисом распознавания. Проверьте интернет.'};
+    say((m[ev.error]||'Не получилось распознать речь.')+' Нажмите на поле ввода и диктуйте значком микрофона на клавиатуре.');
+  };
+  rec.onend=()=>{on=false;$('#mic').classList.remove('on')};
+  try{rec.start();on=true;$('#mic').classList.add('on');say('Говорите…')}catch(e){say('Не удалось включить микрофон.')}
+};
+$('#txt').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.value.trim()){submit(e.target.value);e.target.value=''}
+});
+render();
+</script>
+</body>
+</html>
