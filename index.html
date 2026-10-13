@@ -14,6 +14,9 @@ box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
 main{max-width:560px;margin:0 auto;padding:28px 20px 190px}
+.mn{display:flex;align-items:center;gap:2px;margin-left:-12px}
+.mn button{background:none;border:0;color:var(--ink);font:inherit;font-size:28px;line-height:1;width:44px;height:44px;cursor:pointer}
+.mn button:disabled{color:var(--ln);cursor:default}
 .m{margin:0;color:var(--mut);font-size:15px;text-transform:capitalize}
 h1{margin:2px 0 6px;font-size:clamp(40px,12vw,56px);line-height:1.05;font-weight:800;letter-spacing:-.02em}
 h1.neg{color:var(--exp)}
@@ -56,7 +59,7 @@ footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1p
 </head>
 <body>
 <main>
-  <p class="m" id="month"></p>
+  <div class="mn"><button id="prev" aria-label="Предыдущий месяц">‹</button><p class="m" id="month"></p><button id="next" aria-label="Следующий месяц">›</button></div>
   <h1 id="bal">0 ₽</h1>
   <p class="sub"><span class="i" id="inc"></span><span class="e" id="exp"></span></p>
   <section class="cats" id="cats"></section>
@@ -88,7 +91,7 @@ const INC=['получил','зарплат','аванс','заработал','
 const W={ноль:0,один:1,одна:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19,двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90,сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900,полторы:1.5,полтора:1.5};
 const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
 
-let S=[];let editing=null;
+let S=[];let editing=null;let off=0;
 try{S=JSON.parse(localStorage.getItem('fin_v1')||'[]')}catch(e){S=[]}
 const save=()=>{try{localStorage.setItem('fin_v1',JSON.stringify(S))}catch(e){}};
 
@@ -162,7 +165,8 @@ function editRow(e){
   return row;
 }
 function render(){
-  const now=new Date();
+  const t0=new Date(),now=new Date(t0.getFullYear(),t0.getMonth()+off,1);
+  $('#next').disabled=off>=0;
   const mo=S.filter(e=>{const d=new Date(e.ts);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
   const inc=mo.filter(e=>e.inc).reduce((a,e)=>a+e.amt,0);
   const exp=mo.filter(e=>!e.inc).reduce((a,e)=>a+e.amt,0);
@@ -188,8 +192,9 @@ function render(){
     p.appendChild(el('b','','«купил продукты на 1200»'));p.append(' или «получил зарплату 80 тысяч».');
     box.appendChild(p);return;
   }
+  if(!mo.length){box.appendChild(el('p','empty','В этом месяце записей нет.'));return}
   let last='';
-  [...S].sort((a,b)=>b.ts-a.ts).slice(0,100).forEach(e=>{
+  [...mo].sort((a,b)=>b.ts-a.ts).slice(0,100).forEach(e=>{
     const dl=dayLabel(e.ts);
     if(dl!==last){box.appendChild(el('h3','day',dl));last=dl}
     if(editing===e.id){box.appendChild(editRow(e));return}
@@ -226,6 +231,8 @@ $('#mic').onclick=()=>{
 $('#txt').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.value.trim()){submit(e.target.value);e.target.value=''}
 });
+$('#prev').onclick=()=>{off--;editing=null;render()};
+$('#next').onclick=()=>{if(off<0){off++;editing=null;render()}};
 render();
 </script>
 </body>
