@@ -31,6 +31,12 @@ h1.neg{color:var(--exp)}
 .it .a.i{color:var(--inc)}.it .a.e{color:var(--exp)}
 .it select{appearance:none;-webkit-appearance:none;background:none;border:0;color:var(--mut);font:inherit;font-size:14px;padding:0;margin:0;max-width:100%;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
 .it .x{background:none;border:0;color:var(--mut);font:inherit;font-size:14px;cursor:pointer;justify-self:end;padding:2px 0}
+.it .act{display:flex;gap:18px;justify-self:end}
+.ed{grid-template-columns:1fr 1fr;gap:10px}
+.ed input,.ed select{height:44px;border:1px solid var(--ln);background:var(--sf);color:var(--ink);border-radius:12px;padding:0 12px;font:inherit;font-size:16px;text-decoration:none;min-width:0;width:100%}
+.ed .nin,.ed .act{grid-column:1/-1}
+.ed .act{justify-content:flex-end}
+.it .x.ok{color:var(--ac);font-weight:600}
 .empty{margin:36px 0;color:var(--mut)}
 .empty b{color:var(--ink)}
 footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--ln);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -59,7 +65,7 @@ footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1p
 <footer><div class="in">
   <p id="msg" aria-live="polite"></p>
   <div class="row">
-    <input id="txt" type="text" enterkeyhint="send" autocomplete="off" placeholder="Нажмите и надиктуйте: кофе 250" aria-label="Запись текстом">
+    <input id="txt" type="text" enterkeyhint="send" autocomplete="off" placeholder="Надиктуйте: кофе 250" aria-label="Запись текстом">
     <button id="mic" aria-label="Говорить" title="Говорить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
   </div>
 </div></footer>
@@ -82,7 +88,7 @@ const INC=['получил','зарплат','аванс','заработал','
 const W={ноль:0,один:1,одна:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19,двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90,сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900,полторы:1.5,полтора:1.5};
 const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
 
-let S=[];
+let S=[];let editing=null;
 try{S=JSON.parse(localStorage.getItem('fin_v1')||'[]')}catch(e){S=[]}
 const save=()=>{try{localStorage.setItem('fin_v1',JSON.stringify(S))}catch(e){}};
 
@@ -135,6 +141,26 @@ function dayLabel(ts){
 }
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 
+function editRow(e){
+  const row=el('div','it ed');
+  const n=el('input','nin');n.type='text';n.value=e.note;n.setAttribute('aria-label','Название');
+  const a=el('input');a.type='text';a.inputMode='decimal';a.value=String(e.amt).replace('.',',');a.setAttribute('aria-label','Сумма, ₽');
+  const t=el('select');t.setAttribute('aria-label','Тип');
+  [['0','Расход'],['1','Доход']].forEach(([v,l])=>{const o=el('option','',l);o.value=v;if((v==='1')===e.inc)o.selected=true;t.appendChild(o)});
+  const act=el('span','act');
+  const ok=el('button','x ok','Сохранить');
+  ok.onclick=()=>{
+    const v=parseFloat(a.value.replace(/\s/g,'').replace(',','.'));
+    if(!(v>0)){say('Введите сумму больше нуля.');return}
+    const inc=t.value==='1';
+    if(inc!==e.inc){e.inc=inc;e.cat=inc?'Прочий доход':'Прочее'}
+    e.amt=v;e.note=n.value.trim()||e.note;editing=null;save();render();say('Запись изменена');
+  };
+  const no=el('button','x','Отмена');no.onclick=()=>{editing=null;render()};
+  act.appendChild(no);act.appendChild(ok);
+  row.appendChild(n);row.appendChild(a);row.appendChild(t);row.appendChild(act);
+  return row;
+}
 function render(){
   const now=new Date();
   const mo=S.filter(e=>{const d=new Date(e.ts);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()});
@@ -166,6 +192,7 @@ function render(){
   [...S].sort((a,b)=>b.ts-a.ts).slice(0,100).forEach(e=>{
     const dl=dayLabel(e.ts);
     if(dl!==last){box.appendChild(el('h3','day',dl));last=dl}
+    if(editing===e.id){box.appendChild(editRow(e));return}
     const row=el('div','it');
     row.appendChild(el('span','n',e.note));
     row.appendChild(el('span','a '+(e.inc?'i':'e'),(e.inc?'+':'−')+fmt(e.amt)));
@@ -173,7 +200,8 @@ function render(){
     (e.inc?IC:EC).forEach(c=>{const o=el('option','',c);o.value=c;if(c===e.cat)o.selected=true;sel.appendChild(o)});
     sel.onchange=()=>{e.cat=sel.value;save();render()};
     const x=el('button','x','Удалить');x.onclick=()=>{S=S.filter(i=>i.id!==e.id);save();render()};
-    row.appendChild(sel);row.appendChild(x);box.appendChild(row);
+    const act=el('span','act');const ed=el('button','x','Изменить');ed.onclick=()=>{editing=e.id;render()};
+    act.appendChild(ed);act.appendChild(x);row.appendChild(sel);row.appendChild(act);box.appendChild(row);
   });
 }
 
