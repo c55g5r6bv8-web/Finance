@@ -6,10 +6,10 @@
 <title>Учёт голосом</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;800&display=swap">
 <style>
-:root{--bg:#EDF0EA;--sf:#F8FAF6;--ink:#17231F;--mut:#5E6B66;--ln:#D3D9D1;--inc:#187A52;--exp:#B23A2B;--ac:#2B45E8;--acf:#fff;
+:root{--bg:#EDF0EA;--sf:#F8FAF6;--ink:#17231F;--mut:#5E6B66;--ln:#D3D9D1;--inc:#187A52;--exp:#B23A2B;--ac:#2B45E8;--acf:#fff;--wn:#A86A00;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615}}
-:root[data-theme="dark"]{--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615;--wn:#E3B04B}}
+:root[data-theme="dark"]{--bg:#101615;--sf:#172220;--ink:#E8EEEA;--mut:#93A19B;--ln:#25302D;--inc:#4FCB93;--exp:#FF8A78;--ac:#8CA0FF;--acf:#101615;--wn:#E3B04B}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.45}
@@ -40,6 +40,15 @@ h1.neg{color:var(--exp)}
 .ed .nin,.ed .act{grid-column:1/-1}
 .ed .act{justify-content:flex-end}
 .it .x.ok{color:var(--ac);font-weight:600}
+.bud{margin:18px 0 0}
+.bud .bt{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-weight:600}
+.bud .track{height:10px}
+.bud .bn{margin:8px 0 0;font-size:14px;color:var(--mut)}
+.bud input{height:44px;width:100%;border:1px solid var(--ln);background:var(--sf);color:var(--ink);border-radius:12px;padding:0 12px;font:inherit;font-size:16px;margin-bottom:6px}
+.lnk{background:none;border:0;color:var(--ac);font:inherit;font-weight:600;cursor:pointer;padding:6px 0}
+.bud .lnk.ok{margin-right:18px}
+.ex{margin:28px 0 0}
+.ex button{background:none;border:1px solid var(--ln);color:var(--ink);border-radius:22px;height:44px;padding:0 18px;font:inherit;cursor:pointer}
 .empty{margin:36px 0;color:var(--mut)}
 .empty b{color:var(--ink)}
 footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--ln);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -62,8 +71,10 @@ footer{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1p
   <div class="mn"><button id="prev" aria-label="Предыдущий месяц">‹</button><p class="m" id="month"></p><button id="next" aria-label="Следующий месяц">›</button></div>
   <h1 id="bal">0 ₽</h1>
   <p class="sub"><span class="i" id="inc"></span><span class="e" id="exp"></span></p>
+  <section class="bud" id="bud"></section>
   <section class="cats" id="cats"></section>
   <section id="list"></section>
+  <p class="ex"><button id="csv" hidden>Скачать все записи в таблицу</button></p>
 </main>
 <footer><div class="in">
   <p id="msg" aria-live="polite"></p>
@@ -91,7 +102,8 @@ const INC=['получил','зарплат','аванс','заработал','
 const W={ноль:0,один:1,одна:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19,двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90,сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900,полторы:1.5,полтора:1.5};
 const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
 
-let S=[];let editing=null;let off=0;
+let S=[];let editing=null;let off=0;let editBud=false;let budget=0;
+try{budget=parseFloat(localStorage.getItem('fin_budget'))||0}catch(e){}
 try{S=JSON.parse(localStorage.getItem('fin_v1')||'[]')}catch(e){S=[]}
 const save=()=>{try{localStorage.setItem('fin_v1',JSON.stringify(S))}catch(e){}};
 
@@ -131,8 +143,10 @@ function say(text,undoId){
 function submit(text){
   const e=parse(text);
   if(!e){say('Не услышал сумму. Скажите, например: «такси 450».');return}
-  S.push(e);save();render();
-  say((e.inc?'Доход +':'Расход −')+fmt(e.amt)+' · '+e.cat,e.id);
+  S.push(e);save();off=0;render();
+  let w='';
+  if(!e.inc&&budget){const x=curExp();if(x>budget)w=' · Перерасход бюджета!';else if(x>=budget*.8)w=' · Потрачено '+Math.round(x/budget*100)+'% бюджета'}
+  say((e.inc?'Доход +':'Расход −')+fmt(e.amt)+' · '+e.cat+w,e.id);
 }
 
 function dayLabel(ts){
@@ -144,6 +158,27 @@ function dayLabel(ts){
 }
 function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 
+function curExp(){const n=new Date();return S.filter(e=>{const d=new Date(e.ts);return !e.inc&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()}).reduce((a,e)=>a+e.amt,0)}
+function renderBud(exp){
+  const b=$('#bud');b.textContent='';
+  if(editBud){
+    const i=el('input');i.type='text';i.inputMode='decimal';i.placeholder='Например: 50000 (пусто — убрать бюджет)';i.value=budget?String(budget).replace('.',','):'';i.setAttribute('aria-label','Бюджет на месяц, ₽');
+    const ok=el('button','lnk ok','Сохранить');
+    ok.onclick=()=>{const v=parseFloat(i.value.replace(/\s/g,'').replace(',','.'));if(i.value.trim()&&!(v>0)){say('Введите сумму больше нуля.');return}
+      budget=v>0?v:0;try{localStorage.setItem('fin_budget',String(budget))}catch(e){}editBud=false;render()};
+    const no=el('button','lnk','Отмена');no.onclick=()=>{editBud=false;render()};
+    b.appendChild(i);b.appendChild(ok);b.appendChild(no);return;
+  }
+  if(!budget){const g=el('button','lnk','Задать бюджет на месяц');g.onclick=()=>{editBud=true;render()};b.appendChild(g);return}
+  const pct=exp/budget*100,left=budget-exp;
+  const top=el('div','bt');top.appendChild(el('span','','Бюджет '+fmt(budget)));
+  const ch=el('button','lnk','Изменить');ch.onclick=()=>{editBud=true;render()};top.appendChild(ch);
+  const tr=el('div','track'),f=el('div','fill');f.style.width=Math.min(100,pct)+'%';
+  f.style.background=pct>100?'var(--exp)':pct>=80?'var(--wn)':'var(--inc)';tr.appendChild(f);
+  const t=el('p','bn',left>=0?'Осталось '+fmt(left)+' ('+Math.round(pct)+'% потрачено)':'Перерасход '+fmt(-left));
+  if(left<0)t.style.color='var(--exp)';else if(pct>=80)t.style.color='var(--wn)';
+  b.appendChild(top);b.appendChild(tr);b.appendChild(t);
+}
 function editRow(e){
   const row=el('div','it ed');
   const n=el('input','nin');n.type='text';n.value=e.note;n.setAttribute('aria-label','Название');
@@ -172,7 +207,7 @@ function render(){
   const exp=mo.filter(e=>!e.inc).reduce((a,e)=>a+e.amt,0);
   $('#month').textContent='Баланс за '+now.toLocaleDateString('ru-RU',{month:'long',year:'numeric'});
   $('#bal').textContent=fmt(inc-exp);$('#bal').className=inc-exp<0?'neg':'';
-  $('#inc').textContent='Доходы +'+fmt(inc);$('#exp').textContent='Расходы −'+fmt(exp);
+  $('#inc').textContent='Доходы +'+fmt(inc);$('#exp').textContent='Расходы −'+fmt(exp);renderBud(exp);
 
   const cats=$('#cats');cats.textContent='';
   const by={};mo.filter(e=>!e.inc).forEach(e=>by[e.cat]=(by[e.cat]||0)+e.amt);
@@ -186,7 +221,7 @@ function render(){
     });
   }
 
-  const box=$('#list');box.textContent='';
+  const box=$('#list');box.textContent='';$('#csv').hidden=!S.length;
   if(!S.length){
     const p=el('p','empty');p.append('Пока пусто. Нажмите на микрофон и скажите: ');
     p.appendChild(el('b','','«купил продукты на 1200»'));p.append(' или «получил зарплату 80 тысяч».');
@@ -231,6 +266,15 @@ $('#mic').onclick=()=>{
 $('#txt').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.value.trim()){submit(e.target.value);e.target.value=''}
 });
+$('#csv').onclick=()=>{
+  const q=v=>{let t=String(v);if(/^[=+\-@]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
+  const rows=[['Дата','Тип','Категория','Название','Сумма, ₽']];
+  [...S].sort((a,b)=>a.ts-b.ts).forEach(e=>rows.push([new Date(e.ts).toLocaleDateString('ru-RU'),e.inc?'Доход':'Расход',e.cat,e.note,String(e.amt).replace('.',',')]));
+  const csv='\ufeff'+rows.map(r=>r.map(q).join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='finance.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);say('Таблица скачана: finance.csv');
+};
 $('#prev').onclick=()=>{off--;editing=null;render()};
 $('#next').onclick=()=>{if(off<0){off++;editing=null;render()}};
 render();
